@@ -1,6 +1,6 @@
 # 🧠 MeetingMind — Real-Time AI Meeting Assistant
 
-A context-aware AI co-pilot that listens to live meetings, detects intent, and generates actionable typed suggestions in real time.
+A context-aware AI co-pilot that listens to live meetings, detects intent, and generates actionable typed suggestions in real time. 
 
 ---
 
@@ -203,5 +203,6 @@ All settings are persisted in `localStorage`:
 **Why two-stage intent + suggestion?** A single call with "also detect intent" is unreliable — the model sometimes forgets to return one or mixes it into the JSON. Two focused calls are more predictable, and intent detection is so cheap (10 tokens) it adds under 100ms.
 
 **Why typed suggestions over free-form?** Typed suggestions give users instant visual scanning — they can see at a glance "there's an answer here and a question there." Free-form suggestions all look the same and slow down decision-making during live meetings.
-#   T w i n M i n d - - - L i v e - S u g g e s t i o n s - A s s i g n m e n t  
+#   T w i n M i n d - - - L i v e - S u g g e s t i o n s - A s s i g n m e n t 
+ 
  
