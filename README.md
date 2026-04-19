@@ -1,20 +1,49 @@
-# 🧠 MeetingMind — Real-Time AI Meeting Assistant
+<div align="center">
 
-A context-aware AI co-pilot that listens to live meetings, detects intent, and generates actionable typed suggestions in real time. 
+<br />
+
+# 🧠 MeetingMind
+
+### Real-Time AI Meeting Assistant
+
+> *A context-aware AI co-pilot that listens, understands, and acts — so you can focus on the conversation.*
+
+<br />
+
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Groq](https://img.shields.io/badge/Powered%20by-Groq-orange?style=flat-square)](https://groq.com/)
+[![LLaMA](https://img.shields.io/badge/LLaMA-3.3%2070B-blue?style=flat-square)](https://llama.meta.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+
+<br />
+
+![MeetingMind Demo](https://via.placeholder.com/900x480/0f172a/38bdf8?text=MeetingMind+—+Live+Demo+Screenshot)
+
+<br />
+
+</div>
 
 ---
 
-## ✨ Features
+## ✨ What It Does
+
+MeetingMind transcribes your meeting live, detects the conversation's intent, and surfaces **3 typed, confidence-scored AI suggestions every 30 seconds** — questions to ask, talking points to raise, answers to give, and facts to check. Click any suggestion to open a streaming AI chat with full meeting context.
+
+---
+
+## 🚀 Features
 
 | Feature | Description |
 |---|---|
-| 🎤 Live transcription | Groq Whisper Large V3, chunked every 30s via MediaRecorder |
-| ⚡ Smart suggestions | 3 typed suggestions (question / answer / talking point / fact-check / clarification) per batch |
-| 🎯 Intent detection | Classifies meeting as Interview / Sales / Technical / Brainstorming / Casual — adapts suggestions |
-| 📊 Confidence scores | Each suggestion has a 0–100% confidence score |
-| 💬 Streaming chat | Click any suggestion → get a full streamed AI response with full meeting context |
-| 📤 JSON export | Export complete session: transcript + suggestions + chat with timestamps |
-| ⚙️ Settings panel | Edit suggestion & chat prompts, context window size, refresh interval — persisted in localStorage |
+| 🎤 **Live Transcription** | Groq Whisper Large V3, chunked every 30s via the MediaRecorder API |
+| ⚡ **Smart Suggestions** | 3 typed suggestions per batch — always structurally diverse |
+| 🎯 **Intent Detection** | Auto-classifies as Interview / Sales / Technical / Brainstorming / Casual and adapts suggestions |
+| 📊 **Confidence Scores** | Every suggestion carries a 0–100% confidence score, visualised as a bar |
+| 💬 **Streaming Chat** | Click any suggestion → full streamed AI response with complete meeting context |
+| 📤 **JSON Export** | One-click export: full transcript + suggestions + chat history with timestamps |
+| ⚙️ **Live Settings** | Edit prompts, context window size, and refresh interval at runtime — persisted in `localStorage` |
 
 ---
 
@@ -22,17 +51,17 @@ A context-aware AI co-pilot that listens to live meetings, detects intent, and g
 
 ```
 Browser
-  └── MediaRecorder API (30s chunks)
+  └── MediaRecorder API  (30-second chunks)
         └── POST /api/transcribe  ──→  Groq Whisper Large V3
-              └── TranscriptChunk[] appended to state
+              └── TranscriptChunk[] appended to React state
 
 Every 30s (on chunk completion):
   POST /api/suggestions
-    ├── Step 1: Intent detection  ──→  LLaMA 3.3 70B (max 10 tokens)
-    └── Step 2: Suggestion gen   ──→  LLaMA 3.3 70B (structured JSON)
+    ├── Step 1: Intent Detection  ──→  LLaMA 3.3 70B  (max 10 tokens, ~100ms)
+    └── Step 2: Suggestion Gen    ──→  LLaMA 3.3 70B  (structured JSON)
 
 On suggestion click:
-  POST /api/chat  ──→  LLaMA 3.3 70B (streamed)
+  POST /api/chat  ──→  LLaMA 3.3 70B  (streamed, full transcript context)
 ```
 
 ### 3-Column Layout
@@ -43,90 +72,49 @@ On suggestion click:
 │                  │                  │                  │
 │  Scrolling text  │  3 typed cards   │  Streamed chat   │
 │  per chunk       │  per 30s batch   │  with context    │
-│  with timestamps │  + history       │                  │
+│  with timestamps │  + batch history │                  │
 └──────────────────┴──────────────────┴──────────────────┘
 ```
 
 ---
 
-## 🧠 Prompt Strategy
+## 🧠 Prompt Engineering
 
-### 1. Sliding Window Context
+### 1 — Sliding Window Context
 
-Instead of sending the full transcript on every API call (expensive, slow, hits token limits), we use a sliding window of the last N chunks:
+Instead of sending the full (ever-growing) transcript on every call, a sliding window of the last **N chunks** is used:
 
 ```ts
 const context = transcript.slice(-contextWindowSize) // default: 5 chunks ≈ 2.5 min
 ```
 
-**Tradeoff:** Smaller window = lower latency + lower cost. Larger window = better long-range context. 5 chunks is the sweet spot for most meeting types.
+> **Tradeoff:** Smaller window → lower latency + lower cost. Larger window → better long-range context. 5 chunks is the sweet spot for most meeting types.
 
-### 2. Intent Detection (Two-Stage Pipeline)
+### 2 — Two-Stage Intent Detection
 
-Before generating suggestions, we classify the conversation type:
+A cheap, focused API call (max 10 tokens) classifies the meeting **before** generating suggestions:
 
 ```
 Interview | Sales | Technical Discussion | Brainstorming | Casual
 ```
 
-This uses a separate cheap API call (max_tokens: 10) and adapts the suggestion prompt. An interview should prioritize "answer" types; a technical discussion should prioritize "clarification" and "fact_check". Generic prompts without intent produce generic output.
+A single call asking the model to "also detect intent" is unreliable — the model sometimes forgets or bleeds it into the JSON. Two focused calls are more predictable, and intent detection adds under **100ms** of latency.
 
-### 3. Typed Suggestion Diversity
+### 3 — Typed Suggestion Diversity
 
-Every batch enforces structural diversity — each of the 3 suggestions must be a **different type**:
+Every batch enforces structural variety — each of the 3 suggestions must be a **different type**:
 
-- `question` — A smart follow-up to ask right now
-- `talking_point` — Something relevant to raise or reinforce
-- `answer` — A concise answer to something asked in the meeting
-- `fact_check` — A correction or important caveat
-- `clarification` — Something that needs unpacking
+| Type | Description |
+|---|---|
+| `question` | A smart follow-up to ask right now |
+| `talking_point` | Something relevant to raise or reinforce |
+| `answer` | A concise answer to something asked in the meeting |
+| `fact_check` | A correction or important caveat |
+| `clarification` | Something that needs unpacking |
 
-This prevents the model from returning 3 near-identical suggestions.
+### 4 — Chat Uses Full Context
 
-### 4. Confidence Scores
-
-The model assigns a 0.0–1.0 confidence score to each suggestion based on how grounded it is in the recent conversation. This is surfaced as a visual bar in the UI so users can instantly see which suggestions are most relevant.
-
-### 5. Chat: Full Context vs. Sliding Window
-
-Suggestions use sliding window (speed). Chat uses the **full transcript** (depth). When a user clicks a suggestion and asks a follow-up, they want the most informed response possible — latency matters less than quality here.
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone & install
-
-```bash
-git clone https://github.com/your-username/meeting-assistant
-cd meeting-assistant
-npm install
-```
-
-### 2. Set up env
-
-```bash
-cp .env.local.example .env.local
-# Add your Groq API key: https://console.groq.com/keys
-```
-
-### 3. Run
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
----
-
-## 🔑 Getting a Groq API Key
-
-1. Go to [console.groq.com](https://console.groq.com)
-2. Sign up / log in
-3. Navigate to **API Keys**
-4. Create a new key
-5. Paste into `.env.local`
+Suggestions use the **sliding window** (speed). Chat uses the **full transcript** (depth). When a user drills into a suggestion, latency matters less than the quality of the response.
 
 ---
 
@@ -136,73 +124,129 @@ Open [http://localhost:3000](http://localhost:3000)
 meeting-assistant/
 ├── app/
 │   ├── api/
-│   │   ├── transcribe/route.ts   # Groq Whisper endpoint
-│   │   ├── suggestions/route.ts  # Intent + suggestions pipeline
-│   │   └── chat/route.ts         # Streaming chat endpoint
-│   ├── globals.css               # Design tokens + animations
+│   │   ├── transcribe/route.ts     # Groq Whisper endpoint
+│   │   ├── suggestions/route.ts    # Intent + suggestions pipeline
+│   │   └── chat/route.ts           # Streaming chat endpoint
+│   ├── globals.css                 # Design tokens + animations
 │   ├── layout.tsx
-│   └── page.tsx                  # Orchestrator: state + recording
+│   └── page.tsx                    # Orchestrator: state + recording logic
 │
 ├── components/
-│   ├── Header.tsx                # Record controls, intent badge, actions
-│   ├── Transcript.tsx            # Live scrolling transcript
-│   ├── Suggestions.tsx           # Typed suggestion cards + batch history
-│   ├── Chat.tsx                  # Streaming chat panel
-│   └── Settings.tsx              # Editable prompts + engine config
+│   ├── Header.tsx                  # Record controls, intent badge, actions
+│   ├── Transcript.tsx              # Live scrolling transcript
+│   ├── Suggestions.tsx             # Typed suggestion cards + batch history
+│   ├── Chat.tsx                    # Streaming chat panel
+│   └── Settings.tsx                # Editable prompts + engine config
 │
 └── lib/
-    ├── types.ts                  # TypeScript interfaces
-    ├── groq.ts                   # Groq client singleton + model config
-    ├── prompts.ts                # All prompts with {{placeholder}} system
-    └── utils.ts                  # Settings persistence, formatters, colors
+    ├── types.ts                    # TypeScript interfaces
+    ├── groq.ts                     # Groq client singleton + model config
+    ├── prompts.ts                  # All prompts with {{placeholder}} system
+    └── utils.ts                    # Settings persistence, formatters, helpers
 ```
 
 ---
 
-## ⚙️ Settings (Editable at Runtime)
+## ⚙️ Runtime Settings
 
-All settings are persisted in `localStorage`:
+All settings are persisted in `localStorage` and editable without restarting the app:
 
 | Setting | Default | Description |
 |---|---|---|
-| Suggestion Prompt | Built-in | Full prompt with {{intent}} + {{context}} |
-| Chat Prompt | Built-in | System prompt with {{suggestion}} + {{full_context}} |
-| Context Window | 5 chunks | How many recent chunks to send to AI |
-| Refresh Interval | 30s | How often to chunk audio + generate suggestions |
+| Suggestion Prompt | Built-in | Full prompt template with `{{intent}}` + `{{context}}` |
+| Chat Prompt | Built-in | System prompt with `{{suggestion}}` + `{{full_context}}` |
+| Context Window | 5 chunks | How many recent chunks to include in suggestion calls |
+| Refresh Interval | 30s | How often to chunk audio and generate new suggestions |
 
 ---
 
-## ⚡ Latency Optimizations
+## ⚡ Performance Optimisations
 
-- **Parallel API calls** where possible (intent detection is cheap + fast)
-- **Skeleton loading UI** — never blocks user interaction
+- **Parallel API calls** — intent detection runs concurrently wherever possible
+- **Skeleton loading UI** — never blocks user interaction while waiting for suggestions
 - **Streaming chat** — first token appears in ~300ms
-- **Sliding window** — keeps prompt size bounded regardless of meeting length
-- **Audio size check** — skips near-empty blobs before sending to Whisper
+- **Bounded prompt size** — sliding window keeps token count constant regardless of meeting length
+- **Audio size guard** — near-empty blobs are skipped before sending to Whisper
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
-- **Styling:** Tailwind CSS + custom CSS variables
-- **AI:** Groq SDK (Whisper Large V3 + LLaMA 3.3 70B)
-- **Audio:** Web MediaRecorder API
-- **Streaming:** ReadableStream + TextDecoder
-- **State:** React hooks (no external state library needed)
-- **Persistence:** localStorage (settings only; transcript is session-only by design)
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router) |
+| Styling | Tailwind CSS + custom CSS variables |
+| AI Inference | Groq SDK — Whisper Large V3 + LLaMA 3.3 70B |
+| Audio Capture | Web MediaRecorder API |
+| Streaming | `ReadableStream` + `TextDecoder` |
+| State | React hooks (no external library) |
+| Persistence | `localStorage` (settings only; transcript is session-scoped by design) |
 
 ---
 
-## 🎯 Design Decisions & Tradeoffs
+## 🚦 Getting Started
 
-**Why Groq?** Ultra-low latency inference. For a real-time assistant, a 300ms suggestion feels alive; a 3s suggestion feels dead.
+### Prerequisites
 
-**Why sliding window over full transcript?** Full transcript grows unboundedly. At 1 hour of meeting, you'd be sending 10,000+ tokens per suggestions call. Sliding window keeps it at ~500 tokens regardless of length, with no meaningful loss of recency.
+- Node.js 18+
+- A [Groq API key](https://console.groq.com/keys) (free tier available)
 
-**Why two-stage intent + suggestion?** A single call with "also detect intent" is unreliable — the model sometimes forgets to return one or mixes it into the JSON. Two focused calls are more predictable, and intent detection is so cheap (10 tokens) it adds under 100ms.
+### 1. Clone & Install
 
-**Why typed suggestions over free-form?** Typed suggestions give users instant visual scanning — they can see at a glance "there's an answer here and a question there." Free-form suggestions all look the same and slow down decision-making during live meetings.
-#   T w i n M i n d - - - L i v e - S u g g e s t i o n s - A s s i g n m e n t 
- 
- 
+```bash
+git clone https://github.com/your-username/meeting-assistant
+cd meeting-assistant
+npm install
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.local.example .env.local
+```
+
+Open `.env.local` and add your key:
+
+```env
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+> **Get a key:** [console.groq.com](https://console.groq.com) → Sign up → API Keys → Create new key
+
+### 3. Run
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and start a meeting.
+
+---
+
+## 🎯 Design Decisions
+
+**Why Groq?**
+Ultra-low latency inference. A 300ms suggestion feels alive during a live meeting; a 3s suggestion feels dead. Groq's speed is non-negotiable for this use case.
+
+**Why sliding window instead of full transcript?**
+At an hour-long meeting, sending the full transcript on every suggestion call would mean 10,000+ tokens per request. The sliding window keeps it at ~500 tokens with no meaningful loss of recency.
+
+**Why two separate stages for intent + suggestions?**
+A single combined call is unreliable — models tend to merge or drop the structured intent field. Two focused calls are more predictable, and intent detection is so cheap it adds under 100ms.
+
+**Why typed suggestions over free-form?**
+Typed suggestions give users instant visual scanning — at a glance, you can see "there's an answer here and a question there." Free-form suggestions all look the same and slow down decision-making in a live, time-pressured context.
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+Built with ⚡ by [Ashish Kumar](https://ashishdev-portfolio.vly.site)
+
+</div>
