@@ -1,0 +1,58 @@
+========================================
+VERCEL DEPLOYMENT - COPY & PASTE COMMANDS
+========================================
+
+STEP 1: Login to Vercel
+------------------------
+vercel login
+
+(Browser will open - login with GitHub/Email)
+
+
+STEP 2: Deploy App
+-------------------
+vercel --yes
+
+
+STEP 3: Add API Key (Production)
+---------------------------------
+vercel env add GROQ_API_KEY production
+
+Paste this when prompted:
+[YOUR_GROQ_API_KEY_HERE]
+
+
+STEP 4: Add API Key (Preview)
+------------------------------
+vercel env add GROQ_API_KEY preview
+
+Paste this when prompted:
+[YOUR_GROQ_API_KEY_HERE]
+
+
+STEP 5: Add API Key (Development)
+----------------------------------
+vercel env add GROQ_API_KEY development
+
+Paste this when prompted:
+[YOUR_GROQ_API_KEY_HERE]
+
+
+STEP 6: Deploy to Production
+-----------------------------
+vercel --prod
+
+
+========================================
+DONE! Your app is live! 🎉
+========================================
+
+Your URL will be shown after the final deployment.
+Example: https://meeting-assistant-abc123.vercel.app
+
+All features will work:
+✅ Real-time transcription
+✅ AI suggestions
+✅ Intent detection
+✅ Interactive chat
+✅ Export meeting data
